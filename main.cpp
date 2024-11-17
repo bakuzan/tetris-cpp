@@ -380,6 +380,11 @@ int main()
     std::cout << "Game Over!" << '\n';
     std::cout << "Score: " << score << std::endl;
 
+    // TODO
+    // Create a highscore list in txt file!
+    // Add people with highscores to the list!
+    // Display the highscores!
+
     std::cout << '\n'
               << "Press any key to exit..." << std::endl;
     getchar();
