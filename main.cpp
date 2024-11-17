@@ -21,6 +21,24 @@ unsigned char *pField = nullptr;
 
 // Globals END
 
+void DisableEcho()
+{
+    HANDLE hStdin = GetStdHandle(STD_INPUT_HANDLE);
+    DWORD mode;
+    GetConsoleMode(hStdin, &mode);
+    mode &= ~ENABLE_ECHO_INPUT; // Disable echo input
+    SetConsoleMode(hStdin, mode);
+}
+
+void EnableEcho()
+{
+    HANDLE hStdin = GetStdHandle(STD_INPUT_HANDLE);
+    DWORD mode;
+    GetConsoleMode(hStdin, &mode);
+    mode |= ENABLE_ECHO_INPUT; // Enable echo input
+    SetConsoleMode(hStdin, mode);
+}
+
 int Rotate(int x, int y, int rotations)
 {
     int w = pieceSize;
@@ -67,6 +85,7 @@ bool CanPieceMove(int tetromino, int rotation, int x, int y)
 
 int main()
 {
+    DisableEcho();
 
     // Console size check
     GetConsoleScreenBufferInfo(GetStdHandle(STD_OUTPUT_HANDLE), &sbInfo);
@@ -364,6 +383,8 @@ int main()
     std::cout << '\n'
               << "Press any key to exit..." << std::endl;
     getchar();
+
+    EnableEcho();
 
     return 0;
 }
