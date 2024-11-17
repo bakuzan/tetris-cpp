@@ -1,7 +1,12 @@
 #define UNICODE
+#include <chrono>
 #include <iostream>
 #include <stdio.h>
+#include <thread>
+#include <vector>
 #include <Windows.h>
+
+using namespace std::chrono_literals;
 
 // Globals
 CONSOLE_SCREEN_BUFFER_INFO sbInfo;
@@ -19,12 +24,12 @@ unsigned char *pField = nullptr;
 int Rotate(int x, int y, int rotations)
 {
     int w = pieceSize;
-    switch (rotations)
+    switch (rotations % 4)
     {
     case 0:
         return w * y + x;
     case 1:
-        return (w * (w - 1)) + y + (w * x);
+        return (w * (w - 1)) + y - (w * x);
     case 2:
         return ((w * w) - 1) - (w * y) - x;
     case 3:
@@ -60,32 +65,9 @@ bool CanPieceMove(int tetromino, int rotation, int x, int y)
     return true;
 }
 
-void Draw(wchar_t *screen, int currentPiece, int currentRotation, int currentX, int currentY)
-{
-    int drawOffset = 2;
-    for (int x = 0; x < fieldWidth; x++)
-    {
-        for (int y = 0; y < fieldHeight; y++)
-        {
-            screen[(screenWidth * (y + drawOffset)) + (x + drawOffset)] = L" CBOYGPR=#"[pField[(fieldWidth * y) + x]];
-        }
-    }
-
-    // Draw Piece
-    for (int px = 0; px < pieceSize; px++)
-    {
-        for (int py = 0; py < pieceSize; py++)
-        {
-            if (tetrominoes[currentPiece][Rotate(px, py, currentRotation)] == L'X')
-            {
-                screen[(screenWidth * (currentY + py + drawOffset)) + (currentX + px + drawOffset)] = L"CBOYGPR"[currentPiece];
-            }
-        }
-    }
-}
-
 int main()
 {
+
     // Console size check
     GetConsoleScreenBufferInfo(GetStdHandle(STD_OUTPUT_HANDLE), &sbInfo);
     screenWidth = sbInfo.dwSize.X;
@@ -157,22 +139,194 @@ int main()
     int currentRotation = 0;
     int currentX = fieldWidth / 2;
     int currentY = 0;
+
+    bool keys[4];
+    bool rotateHold = false;
+
+    int speed = 20;
+    int speedCounter = 0;
+    bool forceDown = false;
+    int pieceCounter = 0;
+    int score = 0;
+
+    std::vector<int> lines;
+
     // Game State END
 
     while (!gameOver)
     {
         // Time
+        std::this_thread::sleep_for(50ms);
+        speedCounter++;
+        forceDown = (speedCounter == speed);
 
         // Input
+        for (int k = 0; k < pieceSize; k++)
+        {
+            keys[k] = (0x8000 & GetAsyncKeyState((unsigned char)("ASDZ"[k]))) != 0;
+        }
 
         // Logic
+        // LEFT
+        if (keys[0] && CanPieceMove(currentPiece, currentRotation, currentX - 1, currentY))
+        {
+            currentX -= 1;
+        }
+        // DOWN
+        if (keys[1] && CanPieceMove(currentPiece, currentRotation, currentX, currentY + 1))
+        {
+            currentY += 1;
+        }
+        // RIGHT
+        if (keys[2] && CanPieceMove(currentPiece, currentRotation, currentX + 1, currentY))
+        {
+            currentX += 1;
+        }
+        // ROTATE
+        if (keys[3])
+        {
+            if (!rotateHold && CanPieceMove(currentPiece, currentRotation + 1, currentX, currentY))
+            {
+                currentRotation += 1;
+                rotateHold = true;
+            }
+        }
+        else
+        {
+            rotateHold = false;
+        }
+
+        if (forceDown)
+        {
+            if (CanPieceMove(currentPiece, currentRotation, currentX, currentY + 1))
+            {
+                currentY++;
+            }
+            else
+            {
+                // Lock current piece
+                for (int px = 0; px < pieceSize; px++)
+                {
+                    for (int py = 0; py < pieceSize; py++)
+                    {
+                        if (tetrominoes[currentPiece][Rotate(px, py, currentRotation)] == L'X')
+                        {
+                            pField[(fieldWidth * (currentY + py)) + (currentX + px)] = currentPiece + 1;
+                        }
+                    }
+                }
+
+                // Piece locked, get harder?
+                pieceCounter++;
+                if (pieceCounter % 10 == 0)
+                {
+                    if (speed >= 10)
+                    {
+                        speed--;
+                    }
+                }
+
+                // Complete line?
+                for (int py = 0; py < pieceSize; py++)
+                {
+                    if (currentY + py < fieldHeight - 1)
+                    {
+                        bool line = true;
+                        for (int px = 1; px < fieldWidth - 1; px++)
+                        {
+                            line &= (pField[(fieldWidth * (currentY + py)) + px]) != 0;
+                        }
+
+                        if (line)
+                        {
+                            // Display completed line, will be shortly removed
+                            for (int px = 1; px < fieldWidth - 1; px++)
+                            {
+                                pField[(fieldWidth * (currentY + py)) + px] = 8;
+                            }
+
+                            lines.push_back(currentY + py);
+                        }
+                    }
+                }
+
+                // Update score
+                score += 25;
+                if (!lines.empty())
+                {
+                    score += (1 << lines.size()) * 100;
+                }
+
+                // Set next piece
+                currentX = fieldWidth / 2;
+                currentY = 0;
+                currentRotation = 0;
+                currentPiece = rand() % 7;
+
+                // Is game over?
+                gameOver = !CanPieceMove(currentPiece, currentRotation, currentX, currentY);
+            }
+
+            speedCounter = 0;
+        }
 
         // Draw
-        Draw(screen, currentPiece, currentRotation, currentX, currentY);
+        int drawOffset = 2;
+        for (int x = 0; x < fieldWidth; x++)
+        {
+            for (int y = 0; y < fieldHeight; y++)
+            {
+                screen[(screenWidth * (y + drawOffset)) + (x + drawOffset)] = L" CBOYGPR=#"[pField[(fieldWidth * y) + x]];
+            }
+        }
+
+        // Draw Piece
+        for (int px = 0; px < pieceSize; px++)
+        {
+            for (int py = 0; py < pieceSize; py++)
+            {
+                if (tetrominoes[currentPiece][Rotate(px, py, currentRotation)] == L'X')
+                {
+                    screen[(screenWidth * (currentY + py + drawOffset)) + (currentX + px + drawOffset)] = L"CBOYGPR"[currentPiece];
+                }
+            }
+        }
+
+        // Draw score
+        swprintf_s(&screen[2 * screenWidth + fieldWidth + 6], 16, L"SCORE: %8d", score);
+
+        // Wait! It has completed lines?
+        if (!lines.empty())
+        {
+            // Let complete line be shown for a while
+            WriteConsoleOutputCharacter(hConsole, screen, screenWidth * screenHeight, {0, 0}, &dwBytesWritten);
+            std::this_thread::sleep_for(400ms);
+
+            // Remove completed lines
+            for (auto &l : lines)
+            {
+                for (int px = 1; px < fieldWidth - 1; px++)
+                {
+                    for (int py = l; py > 0; py--)
+                    {
+                        pField[(fieldWidth * py) + px] = pField[(fieldWidth * (py - 1)) + px];
+                    }
+
+                    pField[px] = 0;
+                }
+            }
+
+            lines.clear();
+        }
 
         // Display
         WriteConsoleOutputCharacter(hConsole, screen, screenWidth * screenHeight, {0, 0}, &dwBytesWritten);
     }
+
+    // Game over, tidy up
+    CloseHandle(hConsole);
+    std::cout << "Game Over!" << '\n';
+    std::cout << "Score: " << score << std::endl;
 
     return 0;
 }
