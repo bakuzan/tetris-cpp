@@ -135,7 +135,8 @@ int main()
     // Game State
     bool gameOver = false;
 
-    int currentPiece = 0;
+    int nextPiece = rand() % 7;    // Random piece next!
+    int currentPiece = rand() % 7; // Random starting piece
     int currentRotation = 0;
     int currentX = fieldWidth / 2;
     int currentY = 0;
@@ -148,6 +149,7 @@ int main()
     bool forceDown = false;
     int pieceCounter = 0;
     int score = 0;
+    int lineCount = 0;
 
     std::vector<int> lines;
 
@@ -160,13 +162,14 @@ int main()
         speedCounter++;
         forceDown = (speedCounter == speed);
 
-        // Input
+        /*
+         * INPUT START
+         */
         for (int k = 0; k < pieceSize; k++)
         {
             keys[k] = (0x8000 & GetAsyncKeyState((unsigned char)("ASDZ"[k]))) != 0;
         }
 
-        // Logic
         // LEFT
         if (keys[0] && CanPieceMove(currentPiece, currentRotation, currentX - 1, currentY))
         {
@@ -195,7 +198,13 @@ int main()
         {
             rotateHold = false;
         }
+        /*
+         * INPUT END
+         */
 
+        /*
+         * LOGIC START
+         */
         if (forceDown)
         {
             if (CanPieceMove(currentPiece, currentRotation, currentX, currentY + 1))
@@ -261,7 +270,8 @@ int main()
                 currentX = fieldWidth / 2;
                 currentY = 0;
                 currentRotation = 0;
-                currentPiece = rand() % 7;
+                currentPiece = nextPiece; // Move next piece to current
+                nextPiece = rand() % 7;   // Random next piece
 
                 // Is game over?
                 gameOver = !CanPieceMove(currentPiece, currentRotation, currentX, currentY);
@@ -269,8 +279,13 @@ int main()
 
             speedCounter = 0;
         }
+        /*
+         * LOGIC END
+         */
 
-        // Draw
+        /*
+         * DRAW START
+         */
         int drawOffset = 2;
         for (int x = 0; x < fieldWidth; x++)
         {
@@ -294,6 +309,20 @@ int main()
 
         // Draw score
         swprintf_s(&screen[2 * screenWidth + fieldWidth + 6], 16, L"SCORE: %8d", score);
+        swprintf_s(&screen[3 * screenWidth + fieldWidth + 6], 16, L"LINES: %8d", lineCount);
+        swprintf_s(&screen[5 * screenWidth + fieldWidth + 6], 16, L"Next Piece:");
+
+        // Draw Next Piece Preview
+        for (int px = 0; px < pieceSize; px++)
+        {
+            for (int py = 0; py < pieceSize; py++)
+            {
+                bool solid = tetrominoes[nextPiece][Rotate(px, py, 0)] == L'X';
+                screen[((7 + py) * screenWidth) + fieldWidth + 9 + px] = solid
+                                                                             ? L"CBOYGPR"[nextPiece]
+                                                                             : L" "[0];
+            }
+        }
 
         // Wait! It has completed lines?
         if (!lines.empty())
@@ -316,8 +345,12 @@ int main()
                 }
             }
 
+            lineCount += lines.size();
             lines.clear();
         }
+        /*
+         * DRAW END
+         */
 
         // Display
         WriteConsoleOutputCharacter(hConsole, screen, screenWidth * screenHeight, {0, 0}, &dwBytesWritten);
