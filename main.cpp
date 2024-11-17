@@ -361,5 +361,9 @@ int main()
     std::cout << "Game Over!" << '\n';
     std::cout << "Score: " << score << std::endl;
 
+    std::cout << '\n'
+              << "Press any key to exit..." << std::endl;
+    getchar();
+
     return 0;
 }
