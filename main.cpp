@@ -1,6 +1,8 @@
 #define UNICODE
 #include <chrono>
+#include <fstream>
 #include <iostream>
+#include <sstream>
 #include <stdio.h>
 #include <thread>
 #include <vector>
@@ -20,6 +22,12 @@ int fieldWidth = 12, fieldHeight = 18;
 unsigned char *pField = nullptr;
 
 // Globals END
+
+void ClearInputBuffer()
+{
+    HANDLE hStdin = GetStdHandle(STD_INPUT_HANDLE);
+    FlushConsoleInputBuffer(hStdin);
+}
 
 void DisableEcho()
 {
@@ -377,19 +385,71 @@ int main()
 
     // Game over, tidy up
     CloseHandle(hConsole);
+    ClearInputBuffer();
+    EnableEcho();
     std::cout << "Game Over!" << '\n';
     std::cout << "Score: " << score << std::endl;
 
-    // TODO
-    // Create a highscore list in txt file!
-    // Add people with highscores to the list!
-    // Display the highscores!
+    // Check highscore
+    std::string line, playerName, fileContents;
+    std::string filename = "highscores.txt";
+    std::ifstream infile(filename);
+    std::vector<std::pair<std::string, int>> highscores;
+    while (std::getline(infile, line))
+    {
+        std::istringstream iss(line);
+        std::string name;
+        int highscore;
+        if (!(iss >> name >> highscore))
+        {
+            std::cout << "Error Reading highscores.txt" << std::endl;
+            break;
+        }
 
+        if (playerName.empty() && score > highscore)
+        {
+            std::cout << "Congratulations! You got a highscore!" << "\n"
+                      << "Enter your name: ";
+            std::cin >> playerName;
+            playerName = playerName.empty() ? "Unknown" : playerName.substr(0, 20);
+            highscores.push_back(std::pair(playerName, score));
+            std::string newLine = playerName + " " + std::to_string(score);
+            fileContents += newLine + "\n";
+        }
+
+        if (highscores.size() < 10)
+        {
+            highscores.push_back(std::pair(name, highscore));
+            fileContents += line + "\n";
+        }
+    }
+
+    infile.close();
+
+    // Display highscores
+    std::cout << std::endl;
+    for (auto &p : highscores)
+    {
+        int textWidth = p.first.length() + std::to_string(p.second).length();
+        std::string dots(30 - textWidth, '.');
+        std::cout << p.first << dots << p.second << '\n';
+    }
+    std::cout << std::endl;
+
+    // If highscores changed, write back to file...
+    if (!playerName.empty())
+    {
+        std::ofstream outfile(filename);
+        fileContents.pop_back(); // Get rid of trailing \n
+        outfile << fileContents;
+        outfile.close();
+    }
+
+    // Wait to close...
+    ClearInputBuffer();
     std::cout << '\n'
               << "Press any key to exit..." << std::endl;
     getchar();
-
-    EnableEcho();
 
     return 0;
 }
